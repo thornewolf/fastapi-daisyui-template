@@ -10,13 +10,21 @@ Env variables:
 DATABASE_URL="sqlite:///db.sqlite"
 ```
 
-## Create Migrations
+## Database Management
+
+Whenever you change the schema, run the following commands to migrate the databse. Be sure your env variables are set.
 
 ```bash
 # change some schema
 poetry run alembic revision -m "revision title"
 # inspect migration script
 poetry run alembic upgrade
+```
+
+## Launching the server
+
+```bash
+poetry run uvicorn project.app:app --reload
 ```
 
 ## References

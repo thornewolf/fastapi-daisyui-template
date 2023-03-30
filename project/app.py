@@ -9,10 +9,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from absl import logging
 
 from . import crud, models, schemas
 from .database import SessionLocal, engine
+from .utils import time_cache
+from .scraping.common import ScrapedLink
 
+logging.set_verbosity(logging.INFO)
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -58,5 +62,42 @@ async def send_notification(
     message: str,
     background_tasks: BackgroundTasks,
 ):
+    """
+    Notify the developer of any issues with the service
+    """
     background_tasks.add_task(write_notification, message=message)
     return {"message": "Notification sent in the background"}
+
+
+@app.get("/articles/", summary="Get articles")
+async def articles(sources="", word_filter: str | None = None) -> list[ScrapedLink]:
+    """
+    Fetch article titles and links from various sources.
+
+    - **sources**: Comma-separated list of sources to fetch from. If empty, fetch from all sources.
+    - **word_filter**: Filter results by word. Only articles with this word in the title will be returned.
+
+    The following sources are available:
+
+    `skimfeed,68k,cnn,cbc`
+    """
+    from .scraping import skimfeed, _68k, cnn, cbc
+
+    if sources == "":
+        sources = "skimfeed,68k,cnn,cbc"
+    sources = sources.split(",")
+    result = []
+    for source in sources:
+        if source == "skimfeed":
+            result += skimfeed.scrape_skimfeed()
+        elif source == "68k":
+            result += _68k.scrape_68k()
+        elif source == "cnn":
+            result += cnn.scrape_cnn()
+        elif source == "cbc":
+            result += cbc.scrape_cbc()
+    if word_filter:
+        result = [
+            result for result in result if word_filter.lower() in result.title.lower()
+        ]
+    return list(set(result))
